@@ -34,7 +34,7 @@ class User:
     favorite_number: Optional[int]
 
 
-# set/get classmethods are defined
+# save/get classmethods are defined
 User.save(User(...))
 user = User.get(6)
 
@@ -107,6 +107,11 @@ Maybe we could pass values into args (callback handling orphaned vals, another c
 
 
 ## AGENT GUIDELINES:
-It is **SUPER IMPORTANT** that you don't hack together a 
+It is **SUPER IMPORTANT** that you don't hack together something that is poorly designed.
 
+Since this project is just beginning, I expect a lot of the initial work to be design-based.
+That is, going back/forth and having a discussion about how best to implement things.
+
+Not neccessarily coding; just discussing and planning.
+Reminder: You are working with an experienced engineer, if there's a roadblock, no matter how small, do NOT hack around it; voice your concern instead.
 
