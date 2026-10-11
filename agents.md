@@ -25,7 +25,7 @@ import popcorm
 
 db = popcorm.DB("file.db")
 
-@db.Table
+@db.Bucket
 class User:
     id: str # `id` is a special reserved field, the primary key.
     # it can be int or str. (in this case, it is the user's email)
@@ -38,6 +38,10 @@ class User:
 User.save(User(...))
 user = User.get(6)
 
+
+assert db.get_bucket("User") == User
+
+
 # can do atomic:
 with db.atomic() as txn:
     User.set(User(...), txn=txn)
@@ -47,15 +51,15 @@ with db.atomic() as txn:
 ```
 
 ## How it works:
-There is one "main" implicit B+ that encodes the current schema.
+There is one "main" implicit B+ tree that encodes the current schema.
 this is mostly hidden from the user, and serves only as metadata. (however user can still obviously inspect the metadata and stuff)
 
-Then, each @Table entry get's it's own b+ tree. Hash the fields by exact name and exact type.
-If schema is changed -> a new table is created; old table is made unable to be accessed.
+Then, each @Bucket entry get's it's own b+ tree. Hash the fields by exact name and exact type.
+If schema is changed -> a new bucket is created; old bucket is made unable to be accessed.
 So for example:
 ```py
 # day 1:
-@db.Table
+@db.Bucket
 class User:
     id: int; foo: str
 # db {
@@ -64,8 +68,8 @@ class User:
 ```
 ```py
 # day 2:
-# we change the User table;
-@db.Table
+# we change the User bucket;
+@db.Bucket
 class User:
     id: int
     foo: int; bar: int
@@ -89,8 +93,8 @@ Users maintain their own references using primary-keys.
 ## Migrations:
 DB migrations are the tricky bit: None of it is automatic; it's all implicit.
 This makes it slightly harder for the user; but it also makes it WAY clearer what's actually happening.
-We also expose a classmethod, `MyTable.migrate_orphan_tables()`.
-This collects all schema-tables that are called `MyTable`, then sweeps all entries in orphaned tables to do a "best attempt" at migrating stuff over.
+We also expose a classmethod, `MyBucket.migrate_orphan_buckets()`.
+This collects all schema-buckets that are called `MyBucket`, then sweeps all entries in orphaned buckets to do a "best attempt" at migrating stuff over.
 Maybe we could pass values into args (callback handling orphaned vals, another callback handling new vals, and a final callback handling change in type for a field?)
 
 
@@ -100,3 +104,9 @@ Maybe we could pass values into args (callback handling orphaned vals, another c
 - atomicity is OFF by default; user can bundle writes together if they want.
 - dont need double fsyncs, keep it fast
 - database should NEVER be able to be corrupted
+
+
+## AGENT GUIDELINES:
+It is **SUPER IMPORTANT** that you don't hack together a 
+
+
