@@ -80,9 +80,19 @@ However, it means that users will need to be much more aware of migrations. More
 
 Use ctypes under the hood so reading/writing from the mmap'ed memory is zero overhead.
 
+
+## Indexing:
+No built in special DB indexing.
+Users maintain their own references using primary-keys.
+
+
 ## Migrations:
 DB migrations are the tricky bit: None of it is automatic; it's all implicit.
-Generally, db migrations
+This makes it slightly harder for the user; but it also makes it WAY clearer what's actually happening.
+We also expose a classmethod, `MyTable.migrate_orphan_tables()`.
+This collects all schema-tables that are called `MyTable`, then sweeps all entries in orphaned tables to do a "best attempt" at migrating stuff over.
+Maybe we could pass values into args (callback handling orphaned vals, another callback handling new vals, and a final callback handling change in type for a field?)
+
 
 ## IDEOLOGY:
 - simplicity is best
