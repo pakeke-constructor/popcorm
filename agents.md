@@ -109,6 +109,7 @@ Maybe we could pass values into args (callback handling orphaned vals, another c
 ## IDEOLOGY:
 - simplicity is best
 - less lines of code is better
+- readability is very important. Don't do list-comprehensions for the sake of brevity, and don't write unreadable code for the sake of reducing line-count.
 - atomicity is OFF by default; user can bundle writes together if they want.
 - dont need double fsyncs, keep it fast
 - database should NEVER be able to be corrupted
