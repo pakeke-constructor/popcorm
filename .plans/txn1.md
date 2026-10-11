@@ -48,6 +48,11 @@ Zero-copy: mostly dropped. Pending values are owned bytes; LMDB reads copy (copy
   re-raise on next `flush()`. Also need some map_size strategy (set_mapsize needs no active txns in-process).
 - Multi-process: in scope or not? Unflushed writes are per-process; other processes don't see them; last flush wins.
 
+## HUMAN'S ANSWERS TO QUESTIONS:
+- 1: "how saves/gets find the local dict". I thought that we had one centralized sequencer-thread? so the real question becomes: "How do we find and communicate with the sequencer thread?" is there a way to do it through sockets maybe?
+- 2: commit failure; map-full. Yeah, i think it's hard to get around this. we do the best we can then just raise error. kinda like malloc oom. 
+- multi-process is in scope. Again, wondering if we should gun for the sequencer thread with sockets idea for writes.
+
 ## Files
 - popcorm.py (DB, Row.save/get, add delete/flush/atomic)
 - tests.py
