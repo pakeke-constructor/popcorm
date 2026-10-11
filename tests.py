@@ -69,6 +69,72 @@ def test_is_valid_on_assign():
         assert False
 
 
+def test_buffered_writes():
+    db = make_db()
+
+    @db.Bucket
+    class User:
+        id: int
+        age: int
+
+    User.save(User(id=1, age=2))
+    assert User.get(1).age == 2  # from _pending
+    db.flush()
+    assert db._pending == {} and User.get(1).age == 2  # from LMDB
+    User.delete(1)
+    assert User.get(1) is None
+    db.flush()
+    assert User.get(1) is None
+
+
+def test_atomic():
+    db = make_db()
+
+    @db.Bucket
+    class User:
+        id: int
+        age: int
+
+    with db.atomic() as txn:
+        User.save(User(id=1, age=2), txn=txn)
+        assert User.get(1, txn=txn).age == 2 and User.get(1) is None
+    assert User.get(1).age == 2
+    try:
+        with db.atomic() as txn:
+            User.save(User(id=2, age=3), txn=txn)
+            raise KeyError
+    except KeyError:
+        pass
+    assert User.get(2) is None
+
+
+def test_run_atomic():
+    db = make_db()
+
+    @db.Bucket
+    class Counter:
+        id: int
+        n: int
+
+    Counter.save(Counter(id=1, n=5))  # still pending; run_atomic must see it
+
+    def incr(txn):
+        c = Counter.get(1, txn=txn)
+        c.n += 1
+        Counter.save(c, txn=txn)
+
+    db.run_atomic(incr)
+    assert Counter.get(1).n == 6
+    Counter.save(Counter(id=2, n=0))
+    try:
+        db.run_atomic(lambda txn: 1 / 0)
+    except ZeroDivisionError:
+        pass
+    assert Counter.get(2).n == 0  # aborted batch restored to _pending
+    db.flush()
+    assert Counter.get(2).n == 0
+
+
 if __name__ == "__main__":
     for name, f in list(globals().items()):
         if name.startswith("test_"):

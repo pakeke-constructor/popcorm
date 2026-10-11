@@ -17,7 +17,7 @@ Not a WAL: no log file. LMDB stays the only on-disk store. A WAL would only add 
 
 ## Design
 State on `DB` (single source of truth for unflushed data, per process):
-- `_pending: dict[(dbi, key)] -> bytes | TOMBSTONE`
+- `_pending: dict[(tree, key)] -> bytes | None` (None = delete)
 - `_inflight: dict | None` (batch currently being committed)
 - `_lock` (small; guards `_pending` / `_inflight` swaps + lookups)
 - `_flush_lock` (held across swap + commit; serializes flushes so older batches can't overwrite newer ones)
@@ -60,9 +60,13 @@ Threads / handles:
 
 Zero-copy: mostly dropped. Pending values are owned bytes; LMDB reads copy (copy cost is noise for small rows vs txn overhead).
 
+## Decided (implemented)
+- `run_atomic(fn)`: one write txn applies the swapped `_pending` batch, then runs `fn(t)` (raw lmdb txn, passed as `txn=`), one fsync.
+  `flush()` = `run_atomic()` with no-op fn. If fn raises, txn aborts, batch merges back into `_pending` (newer keys win), exception re-raised.
+- `_pending` keys use one cached LMDB handle per bucket name (`DB._trees`): py-lmdb returns a new, unequal handle per `open_db`.
+
 ## Open questions
-- `run_atomic(fn)`: what does fn receive (txn handle to pass as `txn=`?), and flush-first vs overlay `_pending`.
-- map_size strategy on Windows (pending the check above).
+- map_size strategy on Windows (pending the check above). Separate plan.
 
 ## Files
 - popcorm.py (DB, Row.save/get, add delete/flush/atomic/run_atomic)

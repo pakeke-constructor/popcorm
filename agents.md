@@ -42,11 +42,26 @@ user = User.get(6)
 assert db.get_bucket("User") == User
 
 
-# can do atomic:
+User.delete(6)
+# writes are buffered in memory, and flushed (synced commit) every ~0.2s + at exit.
+# a crash can lose the last ~0.2s of writes, but never corrupts the db.
+db.flush() # force a flush now
+
+
+# can do atomic: (all-or-nothing, lands in one commit. NOT isolated)
 with db.atomic() as txn:
     User.save(User(...), txn=txn)
     User.save(User(...), txn=txn)
     user = User.get(5, txn=txn)
+
+
+# run_atomic: fn runs inside a real LMDB write txn (atomic AND isolated, across threads + processes).
+# for read-modify-write. slower (~1ms, fsync). don't call flush/run_atomic inside fn (deadlock).
+def incr(txn):
+    c = Counter.get(1, txn=txn)
+    c.n += 1
+    Counter.save(c, txn=txn)
+db.run_atomic(incr)
 
 ```
 
@@ -88,9 +103,8 @@ However, it means that users will need to be much more aware of migrations. More
 
 Use ctypes under the hood so reading/writing from the mmap'ed memory is zero overhead.
 
-NOTE (zero-copy): `get()` currently copies the record out of the mmap (`from_buffer_copy`),
-since mmap'd memory is only valid while the read txn is open.
-True zero-copy views are only possible once `atomic()` exists and the caller holds the txn open.
+NOTE (zero-copy): mostly dropped (see .plans/txn1.md). `get()` copies the record (`from_buffer_copy`);
+pending values are owned bytes, and copy cost is noise vs txn overhead for small rows.
 
 
 ## Indexing:
