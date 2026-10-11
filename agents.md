@@ -30,7 +30,7 @@ class User:
     id: str # `id` is a special reserved field, the primary key.
     # it can be int or str. (in this case, it is the user's email)
     name: str
-    age: int # u64
+    age: int # i64
     favorite_number: Optional[int]
 
 
@@ -44,26 +44,30 @@ assert db.get_bucket("User") == User
 
 # can do atomic:
 with db.atomic() as txn:
-    User.set(User(...), txn=txn)
-    User.set(User(...), txn=txn)
+    User.save(User(...), txn=txn)
+    User.save(User(...), txn=txn)
     user = User.get(5, txn=txn)
 
 ```
 
 ## How it works:
-There is one "main" implicit B+ tree that encodes the current schema.
+There is an extra named DB called `schema` that encodes the current schema.
 this is mostly hidden from the user, and serves only as metadata. (however user can still obviously inspect the metadata and stuff)
+(The LMDB main DB can't hold this: its values for named DBs are LMDB-internal records.)
 
-Then, each @Bucket entry get's it's own b+ tree. Hash the fields by exact name and exact type.
+Then, each @Bucket entry get's it's own b+ tree, keyed `Name.{integer}`. integer can just increase indefinitely.
+(`.` isnt valid python identifier char so it works as seperator.)
+The fields (exact name and exact type) are stored inside of the value, in the `schema` DB.
 If schema is changed -> a new bucket is created; old bucket is made unable to be accessed.
+If schema is changed back to an old one -> the old bucket is reused.
 So for example:
 ```py
 # day 1:
 @db.Bucket
 class User:
     id: int; foo: str
-# db {
-#     schema(User, (id=int, foo=str))
+# schema {
+#     User.0: (id=int, foo=str)
 # }
 ```
 ```py
@@ -73,9 +77,9 @@ class User:
 class User:
     id: int
     foo: int; bar: int
-# db {
-# schema(User, (id=int, foo=str))
-# schema(User, (id=int, foo=int, bar=int))
+# schema {
+#     User.0: (id=int, foo=str)
+#     User.1: (id=int, foo=int, bar=int)
 # }
 ```
 This makes it very easy and clear to see orphaned data.
@@ -83,6 +87,10 @@ However, it means that users will need to be much more aware of migrations. More
 
 
 Use ctypes under the hood so reading/writing from the mmap'ed memory is zero overhead.
+
+NOTE (zero-copy): `get()` currently copies the record out of the mmap (`from_buffer_copy`),
+since mmap'd memory is only valid while the read txn is open.
+True zero-copy views are only possible once `atomic()` exists and the caller holds the txn open.
 
 
 ## Indexing:
